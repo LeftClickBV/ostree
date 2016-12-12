@@ -121,17 +121,30 @@ resolve_deploy_path (const char *kernel_cmdline, const char *root_mountpoint)
 
   g_autoptr (GError) error = NULL;
   g_autofree char *ostree_target = NULL;
-  if (!otcore_get_ostree_target (kernel_cmdline, NULL, &ostree_target, &error))
-    errx (EXIT_FAILURE, "Failed to determine ostree target: %s", error->message);
-  if (!ostree_target)
-    errx (EXIT_FAILURE, "No ostree target found");
+  // Try to find the ostree target path by OS name and boot checksum first
+  if (!otcore_get_ostree_target_by_bootcsum (kernel_cmdline, root_mountpoint, &ostree_target, &error))
+    errx (EXIT_FAILURE, "Failed to determine ostree target path by bootcsum: %s", error->message);
+  if (ostree_target != NULL)
+    {
+      if (snprintf (destpath, sizeof (destpath), "%s", ostree_target) < 0)
+        err (EXIT_FAILURE, "Failed to assemble ostree target path");
+    }
+  else
+    {
+      // Try to find the ostree target path the normal way
+      if (!otcore_get_ostree_target (kernel_cmdline, NULL, &ostree_target, &error))
+        errx (EXIT_FAILURE, "Failed to determine ostree target: %s", error->message);
+      if (!ostree_target)
+        errx (EXIT_FAILURE, "No ostree target found");
 
-  if (snprintf (destpath, sizeof (destpath), "%s/%s", root_mountpoint, ostree_target) < 0)
-    err (EXIT_FAILURE, "failed to assemble ostree target path");
-  if (lstat (destpath, &stbuf) < 0)
-    err (EXIT_FAILURE, "Couldn't find specified OSTree root '%s'", destpath);
-  if (!S_ISLNK (stbuf.st_mode))
-    errx (EXIT_FAILURE, "OSTree target is not a symbolic link: %s", destpath);
+      if (snprintf (destpath, sizeof (destpath), "%s/%s", root_mountpoint, ostree_target) < 0)
+        err (EXIT_FAILURE, "failed to assemble ostree target path");
+      if (lstat (destpath, &stbuf) < 0)
+        err (EXIT_FAILURE, "Couldn't find specified OSTree root '%s'", destpath);
+
+      if (!S_ISLNK (stbuf.st_mode))
+        errx (EXIT_FAILURE, "OSTree target is not a symbolic link: %s", destpath);
+    }
   deploy_path = realpath (destpath, NULL);
   if (deploy_path == NULL)
     err (EXIT_FAILURE, "realpath(%s) failed", destpath);

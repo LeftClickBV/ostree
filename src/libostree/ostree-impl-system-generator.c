@@ -301,15 +301,22 @@ _ostree_impl_system_generator (const char *normal_dir, const char *early_dir, co
 
   g_autofree char *ostree_target = NULL;
   gboolean is_aboot = false;
-  if (!otcore_get_ostree_target (cmdline, &is_aboot, &ostree_target, error))
-    return glnx_prefix_error (error, "Invalid aboot ostree target");
+  // Try to find the ostree target path by OS name and boot checksum first
+  if (!otcore_get_ostree_target_by_bootcsum (cmdline, "", &ostree_target, error))
+    return glnx_prefix_error (error, "Invalid ostree target by bootcsum");
+  if (ostree_target == NULL)
+    {
+      // Try to find the ostree target path the normal way
+      if (!otcore_get_ostree_target (cmdline, &is_aboot, &ostree_target, error))
+        return glnx_prefix_error (error, "Invalid aboot ostree target");
 
-  /* If no `ostree=` karg exists, gracefully no-op.
-   * This could happen in CoreOS live environments, where we hackily mock
-   * the `ostree=` karg for `ostree-prepare-root.service` specifically, but
-   * otherwise that karg doesn't exist on the real command-line. */
-  if (!ostree_target)
-    return TRUE;
+      /* If no `ostree=` karg exists, gracefully no-op.
+       * This could happen in CoreOS live environments, where we hackily mock
+       * the `ostree=` karg for `ostree-prepare-root.service` specifically, but
+       * otherwise that karg doesn't exist on the real command-line. */
+      if (!ostree_target)
+        return TRUE;
+    }
 
   if (!require_internal_units (normal_dir, early_dir, late_dir, error))
     return FALSE;

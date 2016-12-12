@@ -124,6 +124,41 @@ otcore_get_ostree_target (const char *cmdline, gboolean *is_aboot, char **out_ta
   return TRUE;
 }
 
+// Find the target OSTree root filesystem by parsing the OS name and boot checksum from
+// the provided kernel commandline.
+// If none is found, @out_target will be set to NULL, and the function will return successfully.
+//
+// If invalid data is found, @error will be set.
+gboolean
+otcore_get_ostree_target_by_bootcsum (const char *cmdline, const char *root_mountpoint,
+                                      char **out_target, GError **error)
+{
+  g_assert (cmdline);
+  g_assert (out_target && *out_target == NULL);
+  struct stat stbuf;
+  g_autofree char *osname = otcore_find_proc_cmdline_key (cmdline, "ostree.osname");
+  g_autofree char *bootcsum = otcore_find_proc_cmdline_key (cmdline, "ostree.bootcsum");
+
+  if (!osname || !bootcsum)
+    return TRUE;
+
+  int i, result;
+  for (i = 0; i < 2; i++)
+    {
+      result = asprintf (out_target,
+                         "%s/ostree/boot.%d/%s/%s/0",
+                         root_mountpoint, i, osname, bootcsum);
+      if (result < 0)
+        return glnx_throw (error, "Failed to allocate memory for ostree target path");
+      if (lstat (*out_target, &stbuf) == 0)
+        return TRUE;
+    }
+
+  *out_target = NULL;
+  return TRUE;
+}
+
+
 // Load a config file; if it doesn't exist, we return an empty configuration.
 // NULL will be returned if we caught an error.
 GKeyFile *
