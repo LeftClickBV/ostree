@@ -28,6 +28,7 @@
 
 #include "ostree-bootloader-aboot.h"
 #include "ostree-bootloader-grub2.h"
+#include "ostree-bootloader-sd-boot.h"
 #include "ostree-bootloader-syslinux.h"
 #include "ostree-bootloader-uboot.h"
 #include "ostree-bootloader-zipl.h"
@@ -1470,6 +1471,8 @@ _ostree_sysroot_new_bootloader_by_type (OstreeSysroot *sysroot,
       return NULL;
     case CFG_SYSROOT_BOOTLOADER_OPT_GRUB2:
       return (OstreeBootloader *)_ostree_bootloader_grub2_new (sysroot);
+    case CFG_SYSROOT_BOOTLOADER_OPT_SDBOOT:
+      return (OstreeBootloader *)_ostree_bootloader_sd_boot_new (sysroot);
     case CFG_SYSROOT_BOOTLOADER_OPT_SYSLINUX:
       return (OstreeBootloader *)_ostree_bootloader_syslinux_new (sysroot);
     case CFG_SYSROOT_BOOTLOADER_OPT_ABOOT:
@@ -1512,6 +1515,7 @@ _ostree_sysroot_query_bootloader (OstreeSysroot *sysroot, OstreeBootloader **out
       OstreeCfgSysrootBootloaderOpt probe[] = {
         CFG_SYSROOT_BOOTLOADER_OPT_SYSLINUX,
         CFG_SYSROOT_BOOTLOADER_OPT_GRUB2,
+        CFG_SYSROOT_BOOTLOADER_OPT_SDBOOT,
         CFG_SYSROOT_BOOTLOADER_OPT_UBOOT,
       };
       for (int i = 0; i < G_N_ELEMENTS (probe); i++)
