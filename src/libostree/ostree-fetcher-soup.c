@@ -521,13 +521,7 @@ ostree_fetcher_session_thread (gpointer data)
   g_main_context_push_thread_default (mainctx);
 
   /* We retain ownership of the SoupSession reference. */
-  closure->session = soup_session_async_new_with_options (SOUP_SESSION_USER_AGENT, OSTREE_FETCHER_USERAGENT_STRING,
-                                                          SOUP_SESSION_SSL_USE_SYSTEM_CA_FILE, TRUE,
-                                                          SOUP_SESSION_USE_THREAD_CONTEXT, TRUE,
-                                                          SOUP_SESSION_ADD_FEATURE_BY_TYPE, SOUP_TYPE_REQUESTER,
-                                                          SOUP_SESSION_TIMEOUT, 60,
-                                                          SOUP_SESSION_IDLE_TIMEOUT, 60,
-                                                          NULL);
+  closure->session = soup_session_new_with_options (SOUP_SESSION_USER_AGENT, "ostree ", NULL);
 
   if (closure->transfer_gzip)
     soup_session_add_feature_by_type (closure->session, SOUP_TYPE_CONTENT_DECODER);
