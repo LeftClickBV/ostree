@@ -761,7 +761,6 @@ _ostree_fetcher_set_proxy (OstreeFetcher *self,
   ProxyData *proxy_data;
 
   g_return_if_fail (OSTREE_IS_FETCHER (self));
-  g_return_if_fail (http_proxy != NULL && http_proxy[0] != '\0');
 
   proxy_data = g_slice_new0 (ProxyData);
   if (http_proxy)
