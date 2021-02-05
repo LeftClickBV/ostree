@@ -17,7 +17,8 @@
 Description=OSTree Remount OS/ Bind Mounts
 Documentation=man:ostree(1)
 DefaultDependencies=no
-ConditionKernelCommandLine=ostree
+ConditionKernelCommandLine=|ostree
+ConditionKernelCommandLine=|ostree.bootcsum
 OnFailure=emergency.target
 Conflicts=umount.target
 # Run after core mounts
