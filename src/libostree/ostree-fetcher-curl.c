@@ -46,6 +46,10 @@
 #define CURLPIPE_MULTIPLEX 0
 #endif
 
+#ifdef HAVE_LIBPROXY
+#include <proxy.h>
+#endif
+
 #include "ostree-date-utils-private.h"
 #include "ostree-enumtypes.h"
 #include "ostree-fetcher-util.h"
@@ -75,6 +79,11 @@ struct OstreeFetcher
   char *tls_client_key_path;
   char *cookie_jar_path;
   char *proxy;
+#ifdef HAVE_LIBPROXY
+  pxProxyFactory *proxy_factory;
+#endif
+  char *proxy_user;
+  char *proxy_password;
   struct curl_slist *extra_headers;
   int tmpdir_dfd;
   bool force_anonymous;
@@ -197,6 +206,11 @@ _ostree_fetcher_finalize (GObject *object)
   g_free (self->tls_client_key_path);
   g_free (self->cookie_jar_path);
   g_free (self->proxy);
+#ifdef HAVE_LIBPROXY
+  px_proxy_factory_free (self->proxy_factory);
+#endif
+  g_free (self->proxy_user);
+  g_free (self->proxy_password);
   g_assert_cmpint (g_hash_table_size (self->outstanding_requests), ==, 0);
   g_clear_pointer (&self->extra_headers, curl_slist_free_all);
   g_hash_table_unref (self->outstanding_requests);
@@ -239,6 +253,9 @@ _ostree_fetcher_init (OstreeFetcher *self)
 {
   CURLMcode rc;
   self->multi = curl_multi_init ();
+#ifdef HAVE_LIBPROXY
+  self->proxy_factory = px_proxy_factory_new();
+#endif
   self->outstanding_requests
       = g_hash_table_new_full (NULL, NULL, (GDestroyNotify)g_object_unref, NULL);
   self->sockets = g_hash_table_new_full (NULL, NULL, (GDestroyNotify)sock_unref, NULL);
@@ -703,10 +720,15 @@ _ostree_fetcher_get_dfd (OstreeFetcher *fetcher)
 }
 
 void
-_ostree_fetcher_set_proxy (OstreeFetcher *self, const char *http_proxy)
+_ostree_fetcher_set_proxy (OstreeFetcher *self,
+                           const char    *http_proxy,
+                           const char    *proxy_user,
+                           const char    *proxy_password)
 {
   g_free (self->proxy);
   self->proxy = g_strdup (http_proxy);
+  self->proxy_user = g_strdup (proxy_user);
+  self->proxy_password = g_strdup (proxy_password);
 }
 
 void
@@ -821,8 +843,8 @@ initiate_next_curl_request (FetcherRequest *req, GTask *task)
   g_assert_cmpint (req->idx, <, req->mirrorlist->len);
 
   GUri *baseuri = req->mirrorlist->pdata[req->idx];
+  g_autofree char *uri = request_get_uri (req, baseuri);
   {
-    g_autofree char *uri = request_get_uri (req, baseuri);
     rc = curl_easy_setopt (req->easy, CURLOPT_URL, uri);
     g_assert_cmpint (rc, ==, CURLM_OK);
   }
@@ -869,6 +891,45 @@ initiate_next_curl_request (FetcherRequest *req, GTask *task)
   if (self->proxy)
     {
       rc = curl_easy_setopt (req->easy, CURLOPT_PROXY, self->proxy);
+      g_assert_cmpint (rc, ==, CURLM_OK);
+    }
+#ifdef HAVE_LIBPROXY
+  else
+    {
+      g_autofree char *proxy = NULL;
+      char **results = px_proxy_factory_get_proxies(self->proxy_factory, uri);
+      if (results)
+        {
+          int i;
+
+          /* We only cope with one; can't fall back on failure */
+          if (results[0] != NULL && g_strcmp0(results[0], "direct://") != 0)
+            {
+              proxy = results[0];
+            }
+          else
+            {
+              free(results[0]);
+            }
+
+          for (i = 1; results[i]; i++)
+            free(results[i]);
+          free(results);
+        }
+
+      if (proxy != NULL)
+        {
+          rc = curl_easy_setopt (req->easy, CURLOPT_PROXY, proxy);
+          g_assert_cmpint (rc, ==, CURLM_OK);
+        }
+    }
+#endif
+
+  if (self->proxy_user && self->proxy_password)
+    {
+      g_autofree char *proxy_auth = g_strconcat (self->proxy_user, ":", self->proxy_password, NULL);
+
+      rc = curl_easy_setopt (req->easy, CURLOPT_PROXYUSERPWD, proxy_auth);
       g_assert_cmpint (rc, ==, CURLM_OK);
     }
 
