@@ -312,13 +312,6 @@ License along with this library. If not, see <https://www.gnu.org/licenses/>.
       </varlistentry>
 
       <varlistentry>
-        <term><varname>proxy-ntlm-auth</varname></term>
-        <listitem><para>A boolean value, defaults to false. If true NTLM
-        authentication should be used for proxy authentication.
-        </para></listitem>
-      </varlistentry>
-
-      <varlistentry>
         <term><varname>gpg-verify</varname></term>
         <listitem><para>A boolean value, defaults to true.
         Controls whether or not OSTree will require commits to be

@@ -122,7 +122,6 @@ typedef struct {
   SoupURI *proxy_uri;
   char *proxy_user;
   char *proxy_password;
-  gboolean ntlm_auth;
 } ProxyData;
 
 struct OstreeFetcher
@@ -315,10 +314,6 @@ session_thread_set_proxy_cb (ThreadClosure *thread_closure,
     g_object_set (thread_closure->session,
                   SOUP_SESSION_PROXY_URI,
                   proxy_data->proxy_uri, NULL);
-
-  if (proxy_data->ntlm_auth)
-    soup_session_add_feature_by_type (thread_closure->session,
-                                      SOUP_TYPE_AUTH_NTLM);
 
   /* libsoup won't necessarily pass any embedded username and password to proxy
    * requests, so we have to be ready to handle 407 and handle them ourselves.
@@ -685,7 +680,7 @@ _ostree_fetcher_constructed (GObject *object)
 
   http_proxy = g_getenv ("http_proxy");
   if (http_proxy != NULL && http_proxy[0] != '\0')
-    _ostree_fetcher_set_proxy (self, http_proxy, NULL, NULL, FALSE);
+    _ostree_fetcher_set_proxy (self, http_proxy, NULL, NULL);
 
   /* FIXME Maybe implement GInitableIface and use g_thread_try_new()
    *       so we can try to handle thread creation errors gracefully? */
@@ -758,8 +753,7 @@ void
 _ostree_fetcher_set_proxy (OstreeFetcher *self,
                            const char    *http_proxy,
                            const char    *proxy_user,
-                           const char    *proxy_password,
-                           gboolean       ntlm_auth)
+                           const char    *proxy_password)
 {
   ProxyData *proxy_data;
 
@@ -783,8 +777,6 @@ _ostree_fetcher_set_proxy (OstreeFetcher *self,
       proxy_data->proxy_user = g_strdup (soup_uri_get_user (proxy_data->proxy_uri));
       proxy_data->proxy_password = g_strdup (soup_uri_get_password (proxy_data->proxy_uri));
     }
-
-  proxy_data->ntlm_auth = ntlm_auth;
 
   session_thread_idle_add (self->thread_closure,
                            session_thread_set_proxy_cb,
