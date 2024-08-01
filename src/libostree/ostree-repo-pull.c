@@ -3030,7 +3030,6 @@ _ostree_repo_remote_new_fetcher (OstreeRepo *self, const char *remote_name, gboo
     g_autofree char *http_proxy = NULL;
     g_autofree char *proxy_user = NULL;
     g_autofree char *proxy_password = NULL;
-    gboolean proxy_ntlm = FALSE;
 
 
     if (!ostree_repo_get_remote_option (self, remote_name, "proxy", NULL, &http_proxy, error))
@@ -3046,18 +3045,11 @@ _ostree_repo_remote_new_fetcher (OstreeRepo *self, const char *remote_name, gboo
                                         &proxy_password, error))
       goto out;
 
-    if (!ostree_repo_get_remote_boolean_option (self, remote_name,
-                                                "proxy-ntlm-auth", FALSE,
-                                                &proxy_ntlm, error))
-      goto out;
-
 
     if ((http_proxy != NULL && http_proxy[0] != '\0') ||
         (proxy_user != NULL && proxy_user[0] != '\0' &&
          proxy_password != NULL && proxy_password[0] != '\0'))
-      _ostree_fetcher_set_proxy (fetcher, http_proxy,
-                                 proxy_user, proxy_password,
-                                 proxy_ntlm);
+      _ostree_fetcher_set_proxy (fetcher, http_proxy, proxy_user, proxy_password);
   }
 
   if (!_ostree_repo_remote_name_is_file (remote_name))
