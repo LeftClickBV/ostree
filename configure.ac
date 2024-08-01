@@ -136,9 +136,35 @@ AS_IF([test x$with_curl != xno ], [
     AC_DEFINE([HAVE_LIBCURL], 1, [Define if we have libcurl.pc])
     dnl Currently using libcurl requires soup for trivial-httpd for tests
     with_soup_default=yes
-], [with_soup_default=check])
+
+    dnl If curl is used, libproxy can be enabled for dynamic proxy resolving.
+    LIBPROXY_DEPENDENCY="libproxy-1.0 >= 0.4.17"
+    AC_ARG_WITH(libproxy,
+          AS_HELP_STRING([--with-libproxy], [Enable support for automated proxy detection via libproxy @<:@default=no@:>@]),
+          [], [with_libproxy=no])
+    AS_IF([test x$with_libproxy != xno], [
+      AC_MSG_CHECKING([for $LIBPROXY_DEPENDENCY])
+      PKG_CHECK_EXISTS($LIBPROXY_DEPENDENCY, have_libproxy=yes, have_libproxy=no)
+      AC_MSG_RESULT([$have_libproxy])
+        AS_IF([ test x$have_libproxy = xno && test x$with_libproxy != xcheck], [
+               AC_MSG_ERROR([libproxy is enabled but could not be found])
+      ])
+      AS_IF([test x$have_libproxy = xyes], [
+        PKG_CHECK_MODULES(OT_DEP_LIBPROXY, $LIBPROXY_DEPENDENCY)
+        AC_DEFINE([HAVE_LIBPROXY], 1, [Define if using libproxy])
+        with_libproxy=yes
+      ],
+      [ with_libproxy=no ])
+    ], [ with_libproxy=no ])
+], [
+  with_soup_default=check
+  with_libproxy=no
+])
 AM_CONDITIONAL(USE_CURL, test x$with_curl != xno)
 if test x$with_curl = xyes; then OSTREE_FEATURES="$OSTREE_FEATURES libcurl"; fi
+AM_CONDITIONAL(USE_LIBPROXY, test x$with_libproxy != xno)
+if test x$with_libproxy != xno; then OSTREE_FEATURES="$OSTREE_FEATURES libproxy"; fi
+
 AC_ARG_ENABLE(http2,
 AS_HELP_STRING([--disable-http2],
   [Disable use of http2 (default: no)]),,
