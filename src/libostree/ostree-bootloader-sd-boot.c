@@ -95,7 +95,7 @@ clean_bootversion (OstreeBootloaderSdBoot *self,
           && g_str_has_suffix (d->d_name, ".conf"))
         {
           /* Ignore failure, not much we can do about it */
-          if (unlinkat(fd, d->d_name, 0) != 0)
+          if (unlinkat(dfd_iter.fd, d->d_name, 0) != 0)
             g_warning("Couldn't unlink %s", d->d_name);
         }
     }
@@ -134,7 +134,7 @@ clean_bootdata (OstreeBootloaderSdBoot *self,
       if (!g_hash_table_contains (active_bootdata, d->d_name))
         {
           /* Ignore failure, not much we can do about it */
-          if (!glnx_shutil_rm_rf_at (fd, d->d_name, cancellable, NULL))
+          if (!glnx_shutil_rm_rf_at (dfd_iter.fd, d->d_name, cancellable, NULL))
             g_warning("Couldn't rm -rf %s", d->d_name);
         }
     }
