@@ -141,7 +141,7 @@ out:
 }
 
 gboolean
-ot_admin_execve_reboot (OstreeSysroot *sysroot, GError **error)
+ot_admin_execve_reboot (OstreeSysroot *sysroot, const char *reboot_arg, GError **error)
 {
   OstreeDeployment *booted = ostree_sysroot_get_booted_deployment (sysroot);
 
@@ -151,7 +151,7 @@ ot_admin_execve_reboot (OstreeSysroot *sysroot, GError **error)
   if (!booted)
     return TRUE;
 
-  if (execlp ("systemctl", "systemctl", "reboot", NULL) < 0)
-    return glnx_throw_errno_prefix (error, "execve(systemctl reboot)");
+  if (execlp ("systemctl", "systemctl", "reboot", reboot_arg, NULL) < 0)
+    return glnx_throw_errno_prefix (error, "execve(systemctl reboot%s%s)", reboot_arg ? " " : "", reboot_arg);
   return TRUE;
 }

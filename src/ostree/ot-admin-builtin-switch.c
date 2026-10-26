@@ -31,9 +31,11 @@
 static gboolean opt_reboot;
 static gboolean opt_kexec;
 static char *opt_osname;
+static char *opt_reboot_arg;
 
 static GOptionEntry options[]
     = { { "reboot", 'r', 0, G_OPTION_ARG_NONE, &opt_reboot, "Reboot after switching trees", NULL },
+        { "reboot-argument", 0, 0, G_OPTION_ARG_STRING, &opt_reboot_arg, "Pass ARG as a reboot argument", "ARG" },
         { "kexec", 'k', 0, G_OPTION_ARG_NONE, &opt_kexec, "Stage new kernel in kexec", NULL },
         { "os", 0, 0, G_OPTION_ARG_STRING, &opt_osname,
           "Use a different operating system root than the current one", "OSNAME" },
@@ -145,7 +147,7 @@ ot_admin_builtin_switch (int argc, char **argv, OstreeCommandInvocation *invocat
 
   if (opt_reboot)
     {
-      if (!ot_admin_execve_reboot (sysroot, error))
+      if (!ot_admin_execve_reboot (sysroot, opt_reboot_arg, error))
         return FALSE;
     }
 

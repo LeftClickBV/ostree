@@ -38,11 +38,13 @@ static gboolean opt_deploy_only;
 static gboolean opt_stage;
 static char *opt_osname;
 static char *opt_override_commit;
+static char *opt_reboot_arg;
 
 static GOptionEntry options[] = {
   { "os", 0, 0, G_OPTION_ARG_STRING, &opt_osname,
     "Use a different operating system root than the current one", "OSNAME" },
   { "reboot", 'r', 0, G_OPTION_ARG_NONE, &opt_reboot, "Reboot after a successful upgrade", NULL },
+  { "reboot-argument", 0, 0, G_OPTION_ARG_STRING, &opt_reboot_arg, "Pass ARG as a reboot argument", "ARG" },
   { "kexec", 'k', 0, G_OPTION_ARG_NONE, &opt_kexec, "Stage new kernel in kexec", NULL },
   { "allow-downgrade", 0, 0, G_OPTION_ARG_NONE, &opt_allow_downgrade,
     "Permit deployment of chronologically older trees", NULL },
@@ -160,7 +162,7 @@ ot_admin_builtin_upgrade (int argc, char **argv, OstreeCommandInvocation *invoca
 
       if (opt_reboot)
         {
-          if (!ot_admin_execve_reboot (sysroot, error))
+          if (!ot_admin_execve_reboot (sysroot, opt_reboot_arg, error))
             return FALSE;
         }
     }

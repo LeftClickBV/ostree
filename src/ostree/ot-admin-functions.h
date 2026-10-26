@@ -35,6 +35,6 @@ OstreeDeployment *ot_admin_get_indexed_deployment (OstreeSysroot *sysroot, int i
 
 gboolean ot_admin_sysroot_lock (OstreeSysroot *sysroot, GError **error);
 
-gboolean ot_admin_execve_reboot (OstreeSysroot *sysroot, GError **error);
+gboolean ot_admin_execve_reboot (OstreeSysroot *sysroot, const char *reboot_arg, GError **error);
 
 G_END_DECLS
