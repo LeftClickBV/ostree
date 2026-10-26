@@ -1054,6 +1054,8 @@ typedef struct
   char *devicetree_namever;
   char *aboot_srcpath;
   char *aboot_namever;
+  char *rpiboot_srcpath;
+  char *rpiboot_namever;
   char *bootcsum;
 } OstreeKernelLayout;
 static void
@@ -1070,6 +1072,8 @@ _ostree_kernel_layout_free (OstreeKernelLayout *layout)
   g_free (layout->devicetree_namever);
   g_free (layout->aboot_srcpath);
   g_free (layout->aboot_namever);
+  g_free (layout->rpiboot_srcpath);
+  g_free (layout->rpiboot_namever);
   g_free (layout->bootcsum);
   g_free (layout);
 }
@@ -1280,6 +1284,7 @@ get_kernel_from_tree_legacy_layouts (int deployment_dfd, OstreeKernelLayout **ou
   g_autofree char *kernel_checksum = NULL;
   g_autofree char *initramfs_checksum = NULL;
   g_autofree char *devicetree_checksum = NULL;
+  g_autofree char *bootimg_checksum = NULL;
   g_autoptr (OstreeKernelLayout) ret_layout = _ostree_kernel_layout_new ();
 
   for (guint i = 0; i < G_N_ELEMENTS (legacy_paths); i++)
@@ -1360,10 +1365,22 @@ get_kernel_from_tree_legacy_layouts (int deployment_dfd, OstreeKernelLayout **ou
               ret_layout->devicetree_namever = g_strndup (name, dash - name);
             }
         }
+      /* See if this is a boot image  */
+      else if (ret_layout->rpiboot_srcpath == NULL && g_str_has_prefix (name, "boot.img-"))
+        {
+          const char *dash = strrchr (name, '-');
+          g_assert (dash);
+          if (ostree_validate_structureof_checksum_string (dash + 1, NULL))
+            {
+              bootimg_checksum = g_strdup (dash + 1);
+              ret_layout->rpiboot_srcpath = g_strdup (name);
+              ret_layout->rpiboot_namever = g_strndup (name, dash - name);
+            }
+        }
 
-      /* If we found a kernel, an initramfs and a devicetree, break out of the loop */
+      /* If we found a kernel, an initramfs, a devicetree and boot image, break out of the loop */
       if (ret_layout->kernel_srcpath != NULL && ret_layout->initramfs_srcpath != NULL
-          && ret_layout->devicetree_srcpath != NULL)
+          && ret_layout->devicetree_srcpath != NULL && ret_layout->rpiboot_srcpath != NULL)
         break;
     }
 
@@ -1392,6 +1409,19 @@ get_kernel_from_tree_legacy_layouts (int deployment_dfd, OstreeKernelLayout **ou
         {
           g_set_error (error, G_IO_ERROR, G_IO_ERROR_NOT_FOUND,
                        "Mismatched kernel checksum vs device tree in tree");
+          return FALSE;
+        }
+    }
+
+  /* The kernel/boot image checksums must be the same */
+  if (ret_layout->rpiboot_srcpath != NULL)
+    {
+      g_assert (kernel_checksum != NULL);
+      g_assert (bootimg_checksum != NULL);
+      if (strcmp (kernel_checksum, bootimg_checksum) != 0)
+        {
+          g_set_error (error, G_IO_ERROR, G_IO_ERROR_NOT_FOUND,
+                       "Mismatched kernel checksum vs boot image in tree");
           return FALSE;
         }
     }
@@ -1959,6 +1989,36 @@ install_deployment_kernel (OstreeSysroot *sysroot, int new_bootversion,
         }
     }
 
+  if (kernel_layout->rpiboot_srcpath)
+    {
+      g_assert (kernel_layout->rpiboot_namever);
+      if (!glnx_fstatat_allow_noent (bootcsum_dfd, kernel_layout->rpiboot_namever, &stbuf, 0,
+                                     error))
+        return FALSE;
+
+      if (errno == ENOENT)
+        {
+          if (!install_into_boot (repo, sepolicy, kernel_layout->boot_dfd,
+                                  kernel_layout->rpiboot_srcpath, bootcsum_dfd,
+                                  kernel_layout->rpiboot_namever, cancellable, error))
+            return FALSE;
+        }
+
+      g_autofree char *rpibootsig_srcpath =
+        g_strdup_printf ("boot.sig-%s", kernel_layout->rpiboot_srcpath + strlen ("boot.img-"));
+      g_autofree char *rpibootsig_namever = g_strdup ("boot.sig");
+
+      if (!glnx_fstatat_allow_noent (bootcsum_dfd, rpibootsig_namever, &stbuf, 0, error))
+        return FALSE;
+
+      if (errno == ENOENT)
+        {
+          if (!install_into_boot (repo, sepolicy, kernel_layout->boot_dfd, rpibootsig_srcpath,
+                                  bootcsum_dfd, rpibootsig_namever, cancellable, error))
+            return FALSE;
+        }
+    }
+
   /* NOTE: if adding more things in bootcsum_dfd, also update get_kernel_layout_size() */
 
   g_autoptr (GPtrArray) overlay_initrds = NULL;
@@ -2141,6 +2201,13 @@ install_deployment_kernel (OstreeSysroot *sysroot, int new_bootversion,
       g_autofree char *dt_boot_relpath
           = g_strconcat (bootprefix, bootcsumdir, "/", kernel_layout->devicetree_srcpath, NULL);
       ostree_bootconfig_parser_set (bootconfig, "fdtdir", dt_boot_relpath);
+    }
+
+  if (kernel_layout->rpiboot_namever)
+    {
+      g_autofree char *rpiboot_relpath
+          = g_strconcat (bootprefix, bootcsumdir, "/", kernel_layout->rpiboot_namever, NULL);
+      ostree_bootconfig_parser_set (bootconfig, "rpiboot", rpiboot_relpath);
     }
 
   /* Note this is parsed in ostree-impl-system-generator.c */
